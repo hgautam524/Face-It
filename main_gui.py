@@ -18,9 +18,12 @@ from attendance_tracker import AttendanceTracker
 class FacialAttendanceSystem:
     def __init__(self, root):
         self.root = root
-        self.root.title("Facial Attendance Recognition System")
+        self.root.title("🎯 Facial Attendance Recognition System")
         self.root.geometry("1400x900")
-        self.root.configure(bg='#f0f0f0')
+        self.root.configure(bg='#f5f5f5')
+        
+        # Configure modern styling
+        self.configure_styles()
         
         # Reduce OpenCV log noise
         try:
@@ -50,6 +53,33 @@ class FacialAttendanceSystem:
         # Start update loop
         self.update_ui()
     
+    def configure_styles(self):
+        """Configure modern styling for the application"""
+        style = ttk.Style()
+        
+        # Configure notebook style
+        style.configure('TNotebook', background='#f5f5f5')
+        style.configure('TNotebook.Tab', padding=[20, 10], font=('Arial', 10, 'bold'))
+        
+        # Configure frame styles
+        style.configure('Card.TFrame', background='white', relief='solid', borderwidth=1)
+        style.configure('Header.TFrame', background='#0078d4', relief='flat')
+        
+        # Configure label styles
+        style.configure('Title.TLabel', font=('Arial', 24, 'bold'), background='#0078d4', foreground='white')
+        style.configure('Subtitle.TLabel', font=('Arial', 14, 'bold'), background='#0078d4', foreground='white')
+        style.configure('Info.TLabel', font=('Arial', 11), background='#0078d4', foreground='white')
+        
+        # Configure button styles - minimal original design
+        style.configure('Primary.TButton', font=('Arial', 10, 'bold'), padding=[10, 5])
+        style.configure('Success.TButton', font=('Arial', 10, 'bold'), padding=[10, 5])
+        style.configure('Warning.TButton', font=('Arial', 10, 'bold'), padding=[10, 5])
+        style.configure('Danger.TButton', font=('Arial', 10, 'bold'), padding=[10, 5])
+        
+        # Configure label frame styles - minimal original design
+        style.configure('Card.TLabelframe', background='#f0f0f0', relief='flat', borderwidth=0)
+        style.configure('Card.TLabelframe.Label', font=('Arial', 10, 'bold'), background='#f0f0f0')
+    
     def load_known_faces(self):
         """Load known faces from database"""
         students = self.database.get_all_students()
@@ -61,21 +91,37 @@ class FacialAttendanceSystem:
         main_container = ttk.Frame(self.root)
         main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Title
-        title_label = ttk.Label(main_container, text="Facial Attendance Recognition System", 
-                               font=('Arial', 20, 'bold'))
-        title_label.pack(pady=(0, 20))
+        # Header frame with gradient effect
+        header_frame = ttk.Frame(main_container, style='Header.TFrame')
+        header_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        # Title with emoji
+        title_label = ttk.Label(header_frame, text="🎯 Facial Attendance Recognition System", 
+                               style='Title.TLabel', foreground='white')
+        title_label.pack(pady=20)
+        
+        # Subtitle
+        subtitle_label = ttk.Label(header_frame, text="Advanced AI-Powered Student Attendance Management", 
+                                  style='Info.TLabel', foreground='white')
+        subtitle_label.pack(pady=(0, 20))
         
         # Create notebook for tabs
         self.notebook = ttk.Notebook(main_container)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
-        # Create tabs
+        # Create tabs with emojis
         self.create_dashboard_tab()
         self.create_camera_tab()
         self.create_students_tab()
         self.create_attendance_tab()
         self.create_reports_tab()
+        
+        # Keep original tab names without emojis
+        self.notebook.tab(0, text="Dashboard")
+        self.notebook.tab(1, text="Camera View")
+        self.notebook.tab(2, text="Students")
+        self.notebook.tab(3, text="Attendance")
+        self.notebook.tab(4, text="Reports")
         
         # Populate camera list on startup
         try:
@@ -183,7 +229,7 @@ class FacialAttendanceSystem:
         camera_frame = ttk.Frame(self.notebook)
         self.notebook.add(camera_frame, text="Camera View")
         
-        # Camera view
+        # Camera view section
         camera_view_frame = ttk.LabelFrame(camera_frame, text="Live Camera Feed", padding=10)
         camera_view_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
@@ -312,6 +358,10 @@ class FacialAttendanceSystem:
         self.export_students_btn = ttk.Button(action_frame, text="Export Students", 
                                              command=self.export_students)
         self.export_students_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.delete_student_btn = ttk.Button(action_frame, text="Delete Selected", 
+                                            command=self.delete_selected_student)
+        self.delete_student_btn.pack(side=tk.LEFT, padx=(0, 10))
         
         self.refresh_students_btn = ttk.Button(action_frame, text="Refresh List", 
                                               command=self.refresh_student_list)
@@ -563,9 +613,13 @@ class FacialAttendanceSystem:
             messagebox.showwarning("Warning", "Camera must be active to capture photo")
             return
         
-        photo = self.student_management.capture_student_photo(self.camera_module)
-        if photo is not None:
-            messagebox.showinfo("Success", "Photo captured successfully")
+        # Set parent for the camera preview window
+        self.student_management.parent = self.root
+        
+        photos = self.student_management.capture_student_photo(self.camera_module)
+        if photos is not None:
+            self.captured_photos = photos
+            messagebox.showinfo("Success", f"Captured {len(photos)} photo(s) successfully")
     
     def load_student_photo(self):
         """Load photo from file for new student"""
@@ -596,16 +650,23 @@ class FacialAttendanceSystem:
             messagebox.showwarning("Warning", "Invalid student ID")
             return
         
-        if self.student_management.current_student_image is None:
-            messagebox.showwarning("Warning", "Please capture or load a photo first")
-            return
+        # Check if photos are available
+        if not hasattr(self, 'captured_photos') or not self.captured_photos:
+            if self.student_management.current_student_image is None:
+                messagebox.showwarning("Warning", "Please capture or load a photo first")
+                return
+            # Use single photo if no multiple photos captured
+            photos = [self.student_management.current_student_image]
+        else:
+            photos = self.captured_photos
         
-        if self.student_management.add_student_from_photo(name, student_id, 
-                                                         self.student_management.current_student_image):
+        if self.student_management.add_student_from_photo(name, student_id, photos):
             # Clear form
             self.student_name_var.set("")
             self.student_id_var.set("")
             self.student_management.current_student_image = None
+            if hasattr(self, 'captured_photos'):
+                self.captured_photos = None
             
             # Refresh student list
             self.refresh_student_list()
@@ -649,6 +710,25 @@ class FacialAttendanceSystem:
                 status
             ))
     
+    def delete_selected_student(self):
+        """Delete the selected student"""
+        selected_item = self.student_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "Please select a student to delete")
+            return
+        
+        # Get student ID from selected item
+        item_values = self.student_tree.item(selected_item[0])['values']
+        student_id = int(item_values[0])  # First column is ID
+        
+        # Delete the student
+        if self.student_management.delete_student(student_id):
+            # Refresh the student list
+            self.refresh_student_list()
+            # Reload known faces
+            self.load_known_faces()
+            self.status_bar.config(text=f"Student deleted successfully")
+
     def export_students(self):
         """Export student data"""
         file_path = filedialog.asksaveasfilename(

@@ -211,9 +211,17 @@ class CameraModule:
         available_cameras = []
         
         for i in range(max_cameras):
-            cap = self._create_capture(i)
-            if cap and cap.isOpened():
-                available_cameras.append(i)
-                cap.release()
+            try:
+                cap = self._create_capture(i)
+                if cap and cap.isOpened():
+                    available_cameras.append(i)
+                    cap.release()
+            except Exception as e:
+                # Silently continue if camera fails
+                continue
+        
+        # If no cameras found, return default indices
+        if not available_cameras:
+            available_cameras = [0, 1, 2]  # Default indices to try
         
         return available_cameras

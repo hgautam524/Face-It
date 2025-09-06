@@ -22,8 +22,9 @@ class SimpleFaceRecognitionModule:
         self.entry_threshold = 3  # Frames to confirm entry
         self.exit_threshold = 5   # Frames to confirm exit
         
-        # Simple face matching threshold
-        self.matching_threshold = 0.7
+        # Improved face matching threshold
+        self.matching_threshold = 0.6  # Lower threshold for better recognition
+        self.face_size = (128, 128)  # Standardized face size for better matching
         
     def load_known_faces(self, students_data: List[Dict]):
         """Load known faces from database"""
@@ -46,8 +47,8 @@ class SimpleFaceRecognitionModule:
         # Convert to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # Detect faces
-        faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
+        # Detect faces with improved parameters
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
         
         self.face_locations = []
         self.face_names = []
@@ -65,24 +66,32 @@ class SimpleFaceRecognitionModule:
             student_id = None
             
             if len(self.known_face_encodings) > 0:
-                # Resize face ROI to match known face size
-                face_roi_resized = cv2.resize(face_roi, (64, 64))
+                # Resize face ROI to standardized size
+                face_roi_resized = cv2.resize(face_roi, self.face_size)
                 
-                # Simple template matching approach
+                # Improved template matching approach
                 best_match = None
                 best_score = 0
                 
                 for i, known_encoding in enumerate(self.known_face_encodings):
-                    # Resize known encoding to match
+                    # Ensure known encoding is the right size
                     if known_encoding.shape != face_roi_resized.shape:
-                        known_encoding = cv2.resize(known_encoding, (64, 64))
+                        known_encoding = cv2.resize(known_encoding, self.face_size)
                     
-                    # Calculate similarity (simple correlation)
+                    # Calculate similarity using normalized cross correlation
                     similarity = cv2.matchTemplate(face_roi_resized, known_encoding, cv2.TM_CCOEFF_NORMED)
                     score = similarity[0][0]
                     
-                    if score > best_score and score > self.matching_threshold:
-                        best_score = score
+                    # Also try histogram comparison for better accuracy
+                    hist1 = cv2.calcHist([face_roi_resized], [0], None, [256], [0, 256])
+                    hist2 = cv2.calcHist([known_encoding], [0], None, [256], [0, 256])
+                    hist_score = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
+                    
+                    # Combine both scores for better accuracy
+                    combined_score = (score + hist_score) / 2
+                    
+                    if combined_score > best_score and combined_score > self.matching_threshold:
+                        best_score = combined_score
                         best_match = i
                 
                 if best_match is not None:
@@ -174,27 +183,99 @@ class SimpleFaceRecognitionModule:
             # Convert to grayscale
             gray = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
             
-            # Detect faces in the image
-            faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
+            # Detect faces in the image with improved parameters
+            faces = self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
             
             if len(faces) > 0:
                 # Use the first face found
                 x, y, w, h = faces[0]
                 face_roi = gray[y:y+h, x:x+w]
                 
-                # Resize to standard size
-                face_encoding = cv2.resize(face_roi, (64, 64))
+                # Resize to standardized size for better matching
+                face_encoding = cv2.resize(face_roi, self.face_size)
+                
+                # Apply histogram equalization for better recognition
+                face_encoding = cv2.equalizeHist(face_encoding)
                 
                 self.known_face_encodings.append(face_encoding)
                 self.known_face_names.append(name)
                 self.known_face_ids.append(student_id)
                 
+                print(f"Added face encoding for {name} (ID: {student_id})")
                 return True
             else:
+                print(f"No face detected in image for {name}")
                 return False
         except Exception as e:
             print(f"Error adding new face: {e}")
             return False
+    
+    def add_multiple_face_angles(self, face_images: List[np.ndarray], name: str, student_id: int) -> bool:
+        """Add multiple face angles for better recognition"""
+        try:
+            successful_encodings = 0
+            
+            for i, face_image in enumerate(face_images):
+                # Convert to grayscale
+                gray = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
+                
+                # Detect faces in the image
+                faces = self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+                
+                if len(faces) > 0:
+                    # Use the first face found
+                    x, y, w, h = faces[0]
+                    face_roi = gray[y:y+h, x:x+w]
+                    
+                    # Resize to standardized size
+                    face_encoding = cv2.resize(face_roi, self.face_size)
+                    
+                    # Apply histogram equalization
+                    face_encoding = cv2.equalizeHist(face_encoding)
+                    
+                    # Add slight variations for better recognition
+                    variations = self._create_face_variations(face_encoding)
+                    
+                    for variation in variations:
+                        self.known_face_encodings.append(variation)
+                        self.known_face_names.append(name)
+                        self.known_face_ids.append(student_id)
+                        successful_encodings += 1
+                    
+                    print(f"Added face encoding {i+1} for {name} (ID: {student_id})")
+            
+            if successful_encodings > 0:
+                print(f"Successfully added {successful_encodings} face encodings for {name}")
+                return True
+            else:
+                print(f"No faces detected in any images for {name}")
+                return False
+                
+        except Exception as e:
+            print(f"Error adding multiple face angles: {e}")
+            return False
+    
+    def _create_face_variations(self, face_encoding: np.ndarray) -> List[np.ndarray]:
+        """Create variations of a face encoding for better recognition"""
+        variations = [face_encoding]  # Original
+        
+        # Brightness variations
+        bright = cv2.convertScaleAbs(face_encoding, alpha=1.2, beta=20)
+        dark = cv2.convertScaleAbs(face_encoding, alpha=0.8, beta=-20)
+        variations.extend([bright, dark])
+        
+        # Slight rotation variations
+        rows, cols = face_encoding.shape
+        for angle in [-5, 5]:
+            M = cv2.getRotationMatrix2D((cols/2, rows/2), angle, 1)
+            rotated = cv2.warpAffine(face_encoding, M, (cols, rows))
+            variations.append(rotated)
+        
+        # Gaussian blur variations (slight)
+        blurred = cv2.GaussianBlur(face_encoding, (3, 3), 0)
+        variations.append(blurred)
+        
+        return variations
     
     def detect_faces_in_image(self, image: np.ndarray) -> List[Tuple]:
         """Detect faces in an image and return locations"""
@@ -216,8 +297,11 @@ class SimpleFaceRecognitionModule:
             # Convert to grayscale
             gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
             
-            # Resize to standard size
-            face_encoding = cv2.resize(gray, (64, 64))
+            # Resize to standardized size
+            face_encoding = cv2.resize(gray, self.face_size)
+            
+            # Apply histogram equalization for better recognition
+            face_encoding = cv2.equalizeHist(face_encoding)
             
             return face_encoding
         except Exception as e:

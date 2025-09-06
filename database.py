@@ -188,6 +188,54 @@ class AttendanceDatabase:
         conn.close()
         return count
     
+    def delete_student(self, student_id: int) -> bool:
+        """Delete a student from the database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Delete student from students table
+            cursor.execute('DELETE FROM students WHERE id = ?', (student_id,))
+            
+            if cursor.rowcount > 0:
+                # Also delete related attendance records
+                cursor.execute('DELETE FROM attendance WHERE student_id = ?', (student_id,))
+                
+                conn.commit()
+                conn.close()
+                return True
+            else:
+                conn.close()
+                return False
+        except Exception as e:
+            print(f"Error deleting student: {e}")
+            return False
+    
+    def get_student_by_id(self, student_id: int) -> Optional[Dict]:
+        """Get a specific student by ID"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT id, name, face_encoding, student_id FROM students WHERE id = ?', (student_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                student = {
+                    'id': row[0],
+                    'name': row[1],
+                    'face_encoding': row[2],
+                    'student_id': row[3]
+                }
+                conn.close()
+                return student
+            else:
+                conn.close()
+                return None
+        except Exception as e:
+            print(f"Error getting student: {e}")
+            return None
+
     def update_daily_summary(self):
         """Update daily summary statistics"""
         conn = sqlite3.connect(self.db_path)

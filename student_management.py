@@ -14,42 +14,48 @@ class StudentManagement:
         self.current_student_image = None
         self.current_face_location = None
         
-    def capture_student_photo(self, camera_module) -> Optional[np.ndarray]:
-        """Capture a photo for a new student"""
+    def capture_student_photo(self, camera_module) -> Optional[List[np.ndarray]]:
+        """Capture multiple photos for a new student using camera preview window"""
         if not camera_module.is_camera_active():
             messagebox.showerror("Error", "Camera is not active. Please start the camera first.")
             return None
         
-        # Capture frame
-        frame = camera_module.capture_single_photo()
-        if frame is None:
-            messagebox.showerror("Error", "Failed to capture photo from camera.")
-            return None
+        # Import here to avoid circular imports
+        from camera_preview_window import CameraPreviewWindow
         
-        # Detect faces in the captured frame
-        face_locations = self.face_recognition_module.detect_faces_in_image(frame)
+        # Create camera preview window
+        preview_window = CameraPreviewWindow(
+            parent=None,  # Will be set by the calling GUI
+            camera_module=camera_module,
+            face_recognition_module=self.face_recognition_module
+        )
         
-        if len(face_locations) == 0:
-            messagebox.showerror("Error", "No face detected in the captured image. Please try again.")
-            return None
-        elif len(face_locations) > 1:
-            messagebox.showerror("Error", "Multiple faces detected. Please ensure only one face is visible.")
-            return None
+        # Wait for the window to close
+        self.parent.wait_window(preview_window.window)
         
-        # Store the face location for later use
-        self.current_face_location = face_locations[0]
-        self.current_student_image = frame
+        # Get the result
+        if hasattr(preview_window.window, 'result'):
+            captured_images = preview_window.window.result
+            if captured_images and len(captured_images) > 0:
+                # Store the first image as current (for compatibility)
+                self.current_student_image = captured_images[0]
+                # Detect face in first image
+                face_locations = self.face_recognition_module.detect_faces_in_image(captured_images[0])
+                if len(face_locations) > 0:
+                    self.current_face_location = face_locations[0]
+                return captured_images
         
-        return frame
+        return None
     
-    def add_student_from_photo(self, name: str, student_id: str, photo: np.ndarray) -> bool:
-        """Add a new student using the captured photo"""
-        if photo is None or self.current_face_location is None:
+    def add_student_from_photo(self, name: str, student_id: str, photos: List[np.ndarray]) -> bool:
+        """Add a new student using multiple captured photos for better recognition"""
+        if not photos or len(photos) == 0:
+            messagebox.showerror("Error", "No photos provided")
             return False
         
         try:
-            # Get face encoding from the detected face
-            face_encoding = self.face_recognition_module.get_face_encoding(photo, self.current_face_location)
+            # Get face encoding from the first photo
+            face_encoding = self.face_recognition_module.get_face_encoding(photos[0], self.current_face_location)
             
             if face_encoding is None:
                 messagebox.showerror("Error", "Failed to extract face encoding. Please try again.")
@@ -62,11 +68,18 @@ class StudentManagement:
             success = self.database.add_student(name, face_encoding_bytes, student_id)
             
             if success:
-                # Add to face recognition module
-                self.face_recognition_module.add_new_face(photo, name, 
-                    self.database.get_all_students()[-1]['id'])
+                # Get the student ID
+                student_db_id = self.database.get_all_students()[-1]['id']
                 
-                messagebox.showinfo("Success", f"Student {name} added successfully!")
+                # Add multiple face angles to recognition module
+                if len(photos) > 1:
+                    # Use multiple angle training
+                    self.face_recognition_module.add_multiple_face_angles(photos, name, student_db_id)
+                else:
+                    # Use single photo
+                    self.face_recognition_module.add_new_face(photos[0], name, student_db_id)
+                
+                messagebox.showinfo("Success", f"Student {name} added successfully with {len(photos)} photo(s)!")
                 return True
             else:
                 messagebox.showerror("Error", f"Student ID {student_id} already exists in the database.")
@@ -126,13 +139,46 @@ class StudentManagement:
     def delete_student(self, student_id: int) -> bool:
         """Delete a student from the system"""
         try:
-            # This would require updating the database schema to support deletion
-            # For now, we'll just show a message
-            messagebox.showinfo("Info", "Student deletion functionality will be implemented in future versions.")
-            return False
+            # Get student info before deletion
+            student = self.database.get_student_by_id(student_id)
+            if not student:
+                messagebox.showerror("Error", "Student not found")
+                return False
+            
+            # Confirm deletion
+            if messagebox.askyesno("Confirm Deletion", 
+                                 f"Are you sure you want to delete student '{student['name']}' (ID: {student['student_id']})?\n\nThis will also delete all attendance records for this student."):
+                
+                # Delete from database
+                if self.database.delete_student(student_id):
+                    # Remove from face recognition module
+                    self._remove_student_from_recognition(student_id)
+                    messagebox.showinfo("Success", f"Student '{student['name']}' deleted successfully")
+                    return True
+                else:
+                    messagebox.showerror("Error", "Failed to delete student from database")
+                    return False
+            else:
+                return False
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete student: {str(e)}")
             return False
+    
+    def _remove_student_from_recognition(self, student_id: int):
+        """Remove student from face recognition module"""
+        try:
+            # Find and remove the student from face recognition lists
+            if student_id in self.face_recognition_module.known_face_ids:
+                index = self.face_recognition_module.known_face_ids.index(student_id)
+                
+                # Remove from all lists
+                del self.face_recognition_module.known_face_encodings[index]
+                del self.face_recognition_module.known_face_names[index]
+                del self.face_recognition_module.known_face_ids[index]
+                
+                print(f"Removed student ID {student_id} from face recognition module")
+        except Exception as e:
+            print(f"Error removing student from recognition: {e}")
     
     def get_student_list(self) -> List[Dict]:
         """Get list of all students"""

